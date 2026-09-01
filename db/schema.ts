@@ -1,2 +1,0 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-export const memories = sqliteTable('memories', { id: text('id').primaryKey(), title: text('title').notNull(), description: text('description').notNull(), category: text('category', { enum: ['viaje','momento'] }).notNull(), date: text('date').notNull(), location: text('location'), mediaKey: text('media_key'), mediaType: text('media_type'), createdAt: integer('created_at').notNull() });
