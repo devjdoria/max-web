@@ -21,6 +21,8 @@ create table if not exists public.site_content (
   hero_name text not null default 'Maxime',
   hero_description text not null default 'Hoy celebramos tus 21 años, pero yo celebro cada día la suerte de compartir la vida contigo.',
   hero_media_path text,
+  hero_left_media_path text,
+  hero_right_media_path text,
   story_kicker text not null default 'Nuestro pequeño universo',
   story_title text not null default 'Una historia que seguimos escribiendo',
   story_description text not null default 'Aquí viven los viajes, las risas inesperadas y esos días normales que contigo se convierten en recuerdos para siempre.',
@@ -28,6 +30,9 @@ create table if not exists public.site_content (
   footer_text text not null default 'Que este sea solo el capítulo 21 de una historia infinita.',
   updated_at timestamptz not null default now()
 );
+
+alter table public.site_content add column if not exists hero_left_media_path text;
+alter table public.site_content add column if not exists hero_right_media_path text;
 
 insert into public.site_content (id) values ('main') on conflict (id) do nothing;
 

@@ -1,6 +1,126 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { hasAccess } from '@/lib/access';
 
-function withHeroUrl(content: Record<string,unknown>) { const path = content.hero_media_path as string|null; return {...content,hero_media_url:path ? getSupabaseAdmin().storage.from('memories').getPublicUrl(path).data.publicUrl : null}; }
-export async function GET() { try { const supabase=getSupabaseAdmin(); const [{data:content,error},{data:surprises,error:surpriseError}] = await Promise.all([supabase.from('site_content').select('*').eq('id','main').single(),supabase.from('surprises').select('*').order('position')]); if(error||surpriseError) throw error||surpriseError; return Response.json({content:withHeroUrl(content),surprises}); } catch (cause) { console.error('Supabase content error',cause); const allowed=await hasAccess(); const message=allowed&&cause&&typeof cause==='object'&&'message' in cause?String(cause.message):undefined; const url=process.env.NEXT_PUBLIC_SUPABASE_URL??''; const key=process.env.SUPABASE_SERVICE_ROLE_KEY??''; const projectRef=url.match(/^https:\/\/([^.]+)\.supabase\.co/)?.[1]??'URL no reconocida'; const keyType=key.startsWith('sb_secret_')?'sb_secret':key.startsWith('eyJ')?'service_role JWT':key?'formato desconocido':'ausente'; const diagnostic=allowed?{projectRef,keyType,keyLength:key.length,hasOuterWhitespace:key!==key.trim()}:undefined; return Response.json({error:'No se pudo cargar el contenido',detail:message,diagnostic},{status:500}); } }
-export async function PATCH(request:Request) { if(!await hasAccess()) return Response.json({error:'Acceso necesario'},{status:401}); try { const body=await request.json() as {content?:Record<string,unknown>;surprises?:Array<Record<string,unknown>>}; const supabase=getSupabaseAdmin(); if(body.content){const allowed=['hero_eyebrow','hero_pretitle','hero_title','hero_name','hero_description','hero_media_path','story_kicker','story_title','story_description','love_note','footer_text']; const clean=Object.fromEntries(Object.entries(body.content).filter(([key])=>allowed.includes(key))); const {error}=await supabase.from('site_content').update({...clean,updated_at:new Date().toISOString()}).eq('id','main');if(error)throw error;} if(body.surprises){for(const item of body.surprises){const payload={position:item.position,label:item.label,title:item.title,description:item.description,cover_path:item.cover_path||null,locked:Boolean(item.locked),unlock_at:item.unlock_at||null,updated_at:new Date().toISOString()}; if(item.id){const {error}=await supabase.from('surprises').update(payload).eq('id',item.id);if(error)throw error;}else{const {error}=await supabase.from('surprises').insert(payload);if(error)throw error;}}} return Response.json({saved:true}); } catch { return Response.json({error:'No se pudo guardar el contenido'},{status:500}); } }
+function withHeroUrl(content: Record<string, unknown>) {
+  const storage = getSupabaseAdmin().storage.from('memories');
+  const publicUrl = (path: unknown) =>
+    typeof path === 'string' && path
+      ? storage.getPublicUrl(path).data.publicUrl
+      : null;
+  return {
+    ...content,
+    hero_media_url: publicUrl(content.hero_media_path),
+    hero_left_media_url: publicUrl(content.hero_left_media_path),
+    hero_right_media_url: publicUrl(content.hero_right_media_path),
+  };
+}
+export async function GET() {
+  try {
+    const supabase = getSupabaseAdmin();
+    const [
+      { data: content, error },
+      { data: surprises, error: surpriseError },
+    ] = await Promise.all([
+      supabase.from('site_content').select('*').eq('id', 'main').single(),
+      supabase.from('surprises').select('*').order('position'),
+    ]);
+    if (error || surpriseError) throw error || surpriseError;
+    return Response.json({ content: withHeroUrl(content), surprises });
+  } catch (cause) {
+    console.error('Supabase content error', cause);
+    const allowed = await hasAccess();
+    const message =
+      allowed && cause && typeof cause === 'object' && 'message' in cause
+        ? String(cause.message)
+        : undefined;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+    const projectRef =
+      url.match(/^https:\/\/([^.]+)\.supabase\.co/)?.[1] ?? 'URL no reconocida';
+    const keyType = key.startsWith('sb_secret_')
+      ? 'sb_secret'
+      : key.startsWith('eyJ')
+        ? 'service_role JWT'
+        : key
+          ? 'formato desconocido'
+          : 'ausente';
+    const diagnostic = allowed
+      ? {
+          projectRef,
+          keyType,
+          keyLength: key.length,
+          hasOuterWhitespace: key !== key.trim(),
+        }
+      : undefined;
+    return Response.json(
+      { error: 'No se pudo cargar el contenido', detail: message, diagnostic },
+      { status: 500 },
+    );
+  }
+}
+export async function PATCH(request: Request) {
+  if (!(await hasAccess()))
+    return Response.json({ error: 'Acceso necesario' }, { status: 401 });
+  try {
+    const body = (await request.json()) as {
+      content?: Record<string, unknown>;
+      surprises?: Array<Record<string, unknown>>;
+    };
+    const supabase = getSupabaseAdmin();
+    if (body.content) {
+      const allowed = [
+        'hero_eyebrow',
+        'hero_pretitle',
+        'hero_title',
+        'hero_name',
+        'hero_description',
+        'hero_media_path',
+        'hero_left_media_path',
+        'hero_right_media_path',
+        'story_kicker',
+        'story_title',
+        'story_description',
+        'love_note',
+        'footer_text',
+      ];
+      const clean = Object.fromEntries(
+        Object.entries(body.content).filter(([key]) => allowed.includes(key)),
+      );
+      const { error } = await supabase
+        .from('site_content')
+        .update({ ...clean, updated_at: new Date().toISOString() })
+        .eq('id', 'main');
+      if (error) throw error;
+    }
+    if (body.surprises) {
+      for (const item of body.surprises) {
+        const payload = {
+          position: item.position,
+          label: item.label,
+          title: item.title,
+          description: item.description,
+          cover_path: item.cover_path || null,
+          locked: Boolean(item.locked),
+          unlock_at: item.unlock_at || null,
+          updated_at: new Date().toISOString(),
+        };
+        if (item.id) {
+          const { error } = await supabase
+            .from('surprises')
+            .update(payload)
+            .eq('id', item.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('surprises').insert(payload);
+          if (error) throw error;
+        }
+      }
+    }
+    return Response.json({ saved: true });
+  } catch {
+    return Response.json(
+      { error: 'No se pudo guardar el contenido' },
+      { status: 500 },
+    );
+  }
+}
