@@ -11,6 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
+import Link from 'next/link';
 
 type Content = Record<string, string | null>;
 type Surprise = {
@@ -68,7 +69,7 @@ export default function AdminPortal() {
   useEffect(() => {
     void load();
   }, []);
-  async function unlock(e: React.FormEvent<HTMLFormElement>) {
+  async function unlock(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     const d = new FormData(e.currentTarget);
     const r = await fetch('/api/access', {
@@ -150,7 +151,7 @@ export default function AdminPortal() {
           <h1>El portal no puede cargar todavía</h1>
           <p>{loadError}</p>
           <button onClick={() => void load()}>Volver a intentar</button>
-          <a href="/">Volver a la web</a>
+          <Link href="/">Volver a la web</Link>
         </div>
       </main>
     );
@@ -194,7 +195,7 @@ export default function AdminPortal() {
             <h1>Todo vuestro universo, en tus manos</h1>
           </div>
         </div>
-        <a href="/">Ver la web</a>
+        <Link href="/">Ver la web</Link>
       </header>
       <section className="admin-shell">
         <aside>
@@ -238,7 +239,9 @@ export default function AdminPortal() {
                     alt="Foto retro izquierda"
                   />
                 ) : (
-                  <span><ImagePlus /> Foto retro izquierda</span>
+                  <span>
+                    <ImagePlus /> Foto retro izquierda
+                  </span>
                 )}
                 <label>
                   Cambiar foto izquierda
@@ -262,7 +265,9 @@ export default function AdminPortal() {
                     alt="Foto retro derecha"
                   />
                 ) : (
-                  <span><ImagePlus /> Foto retro derecha</span>
+                  <span>
+                    <ImagePlus /> Foto retro derecha
+                  </span>
                 )}
                 <label>
                   Cambiar foto derecha

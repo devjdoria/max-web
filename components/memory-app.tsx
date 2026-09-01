@@ -242,7 +242,7 @@ export default function MemoryApp() {
       setFormOpen(true);
     });
   }
-  async function unlock(event: React.FormEvent<HTMLFormElement>) {
+  async function unlock(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const response = await fetch('/api/access', {
@@ -266,7 +266,7 @@ export default function MemoryApp() {
       timeZone: 'UTC',
     }).format(new Date(`${date}T00:00:00Z`));
 
-  async function saveMemory(event: React.FormEvent<HTMLFormElement>) {
+  async function saveMemory(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setSaved(false);
