@@ -1,6 +1,8 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { hasAccess } from '@/lib/access';
 
 export async function POST(request: Request) {
+  if (!await hasAccess()) return Response.json({error:'Acceso necesario'},{status:401});
   try {
     const { name, type, size } = await request.json() as { name?: string; type?: string; size?: number };
     if (!name || !type || !size || size > 200 * 1024 * 1024 || (!type.startsWith('image/') && !type.startsWith('video/'))) return Response.json({error:'Archivo no válido'},{status:400});

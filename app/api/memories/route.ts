@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { hasAccess } from '@/lib/access';
 
 export const runtime = 'nodejs';
 const BUCKET = 'memories';
@@ -23,11 +24,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!await hasAccess()) return Response.json({error:'Acceso necesario'},{status:401});
   try { const data = await request.formData(); const fields = readFields(data); if (!valid(fields)) return Response.json({error:'Datos incompletos'},{status:400}); const media_path = String(data.get('mediaPath') ?? '') || null; const media_type = String(data.get('mediaType') ?? '') || null; const supabase = getSupabaseAdmin(); const { data: row, error } = await supabase.from('memories').insert({...fields,category:fields.category as 'viaje'|'momento',media_path,media_type}).select().single(); if (error) throw error; return Response.json(present(row as Row),{status:201}); }
   catch { return Response.json({error:'No se pudo guardar el recuerdo'},{status:500}); }
 }
 
 export async function PATCH(request: Request) {
+  if (!await hasAccess()) return Response.json({error:'Acceso necesario'},{status:401});
   try { const data = await request.formData(); const id = String(data.get('id') ?? ''); const fields = readFields(data); if (!/^[a-f0-9-]{36}$/.test(id) || !valid(fields)) return Response.json({error:'Datos incompletos'},{status:400}); const mediaPath = String(data.get('mediaPath') ?? ''); const media = mediaPath ? {media_path:mediaPath,media_type:String(data.get('mediaType') ?? '')} : {}; const supabase = getSupabaseAdmin(); const { data: row, error } = await supabase.from('memories').update({...fields,category:fields.category as 'viaje'|'momento',...media,updated_at:new Date().toISOString()}).eq('id',id).select().single(); if (error) throw error; return Response.json(present(row as Row)); }
   catch { return Response.json({error:'No se pudo actualizar el recuerdo'},{status:500}); }
 }
