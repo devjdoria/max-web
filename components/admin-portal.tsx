@@ -94,8 +94,10 @@ export default function AdminPortal() {
   ) {
     if (!file || !content) return;
     setSaving(true);
+    setSaved(false);
+    setError('');
     try {
-      const ticket = await fetch('/api/uploads', {
+      const ticketResponse = await fetch('/api/uploads', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -103,18 +105,45 @@ export default function AdminPortal() {
           type: file.type,
           size: file.size,
         }),
-      }).then((r) => r.json());
+      });
+      const ticket = await ticketResponse.json();
+      if (!ticketResponse.ok || !ticket.path || !ticket.token) {
+        throw new Error(ticket.error || 'No se pudo preparar la subida.');
+      }
       const { error } = await getSupabaseBrowser()
         .storage.from('memories')
         .uploadToSignedUrl(ticket.path, ticket.token, file, {
           contentType: file.type,
         });
       if (error) throw error;
-      setContent({
-        ...content,
-        [pathKey]: ticket.path,
-        [urlKey]: URL.createObjectURL(file),
+      const saveResponse = await fetch('/api/content', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ content: { [pathKey]: ticket.path } }),
       });
+      const saveResult = await saveResponse.json();
+      if (!saveResponse.ok) {
+        throw new Error(
+          saveResult.error || 'La imagen se subió, pero no se pudo publicar.',
+        );
+      }
+      setContent((current) =>
+        current
+          ? {
+              ...current,
+              [pathKey]: ticket.path,
+              [urlKey]: URL.createObjectURL(file),
+            }
+          : current,
+      );
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 1800);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'No se pudo subir y publicar la imagen.',
+      );
     } finally {
       setSaving(false);
     }
@@ -123,6 +152,7 @@ export default function AdminPortal() {
     if (!content) return;
     setSaving(true);
     setSaved(false);
+    setError('');
     const r = await fetch('/api/content', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
@@ -132,7 +162,10 @@ export default function AdminPortal() {
     if (r.ok) {
       setSaved(true);
       setTimeout(() => setSaved(false), 1800);
-    } else setError('No se pudieron guardar los cambios.');
+    } else {
+      const result = await r.json().catch(() => null);
+      setError(result?.error || 'No se pudieron guardar los cambios.');
+    }
   }
   if (loading)
     return (
@@ -204,6 +237,11 @@ export default function AdminPortal() {
           <a href="/#recuerdos">Recuerdos</a>
         </aside>
         <div className="admin-content">
+          {error && (
+            <div className="admin-notice" role="alert">
+              {error}
+            </div>
+          )}
           <section id="portada">
             <p className="section-kicker">Contenido principal</p>
             <h2>Portada y textos</h2>

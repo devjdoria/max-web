@@ -117,7 +117,6 @@ export default function MemoryApp() {
   const [editing, setEditing] = useState<Memory | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
   const [accessError, setAccessError] = useState('');
-  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [surprise, setSurprise] = useState<string | null>(null);
@@ -219,16 +218,13 @@ export default function MemoryApp() {
     const result = (await response.json()) as { authenticated: boolean };
     if (result.authenticated) action();
     else {
-      setPendingAction(() => action);
       setAccessError('');
       setAccessOpen(true);
     }
   }
   function openNewMemory() {
-    void withAccess(() => {
-      setEditing(null);
-      setFormOpen(true);
-    });
+    setEditing(null);
+    void withAccess(() => setFormOpen(true));
   }
   function openEditMemory(memory: Memory) {
     if (memory.id.startsWith('demo-')) {
@@ -237,10 +233,8 @@ export default function MemoryApp() {
       );
       return;
     }
-    void withAccess(() => {
-      setEditing(memory);
-      setFormOpen(true);
-    });
+    setEditing(memory);
+    void withAccess(() => setFormOpen(true));
   }
   async function unlock(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -255,8 +249,8 @@ export default function MemoryApp() {
       return;
     }
     setAccessOpen(false);
-    pendingAction?.();
-    setPendingAction(null);
+    // Let the access dialog release its focus lock before opening the form.
+    window.setTimeout(() => setFormOpen(true), 500);
   }
   const prettyDate = (date: string) =>
     new Intl.DateTimeFormat('es-ES', {
@@ -626,6 +620,7 @@ export default function MemoryApp() {
         <small>Hecho con amor, para Maxime.</small>
       </footer>
       <Dialog
+        modal={false}
         open={formOpen}
         onOpenChange={(open) => {
           setFormOpen(open);
@@ -733,7 +728,7 @@ export default function MemoryApp() {
           </form>
         </DialogContent>
       </Dialog>
-      <Dialog open={accessOpen} onOpenChange={setAccessOpen}>
+      <Dialog modal={false} open={accessOpen} onOpenChange={setAccessOpen}>
         <DialogContent className="access-dialog">
           <DialogHeader>
             <DialogTitle>Solo nosotros sabemos la respuesta</DialogTitle>
@@ -751,6 +746,7 @@ export default function MemoryApp() {
         </DialogContent>
       </Dialog>
       <Dialog
+        modal={false}
         open={!!surprise}
         onOpenChange={(open) => !open && setSurprise(null)}
       >
