@@ -23,6 +23,7 @@ create table if not exists public.site_content (
   hero_media_path text,
   hero_left_media_path text,
   hero_right_media_path text,
+  hero_polaroids jsonb,
   story_kicker text not null default 'Nuestro pequeño universo',
   story_title text not null default 'Una historia que seguimos escribiendo',
   story_description text not null default 'Aquí viven los viajes, las risas inesperadas y esos días normales que contigo se convierten en recuerdos para siempre.',
@@ -33,6 +34,7 @@ create table if not exists public.site_content (
 
 alter table public.site_content add column if not exists hero_left_media_path text;
 alter table public.site_content add column if not exists hero_right_media_path text;
+alter table public.site_content add column if not exists hero_polaroids jsonb;
 
 insert into public.site_content (id) values ('main') on conflict (id) do nothing;
 

@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { hasAccess } from '@/lib/access';
+import { normalizeHeroPolaroids } from '@/lib/hero-polaroids';
 
 function withHeroUrl(content: Record<string, unknown>) {
   const storage = getSupabaseAdmin().storage.from('memories');
@@ -7,11 +8,26 @@ function withHeroUrl(content: Record<string, unknown>) {
     typeof path === 'string' && path
       ? storage.getPublicUrl(path).data.publicUrl
       : null;
+  const polaroids = normalizeHeroPolaroids(content.hero_polaroids);
+  if (!Array.isArray(content.hero_polaroids)) {
+    polaroids[0].media_path =
+      typeof content.hero_left_media_path === 'string'
+        ? content.hero_left_media_path
+        : null;
+    polaroids[1].media_path =
+      typeof content.hero_right_media_path === 'string'
+        ? content.hero_right_media_path
+        : null;
+  }
   return {
     ...content,
     hero_media_url: publicUrl(content.hero_media_path),
     hero_left_media_url: publicUrl(content.hero_left_media_path),
     hero_right_media_url: publicUrl(content.hero_right_media_path),
+    hero_polaroids: polaroids.map((item) => ({
+      ...item,
+      media_url: publicUrl(item.media_path),
+    })),
   };
 }
 export async function GET() {
@@ -77,6 +93,7 @@ export async function PATCH(request: Request) {
         'hero_media_path',
         'hero_left_media_path',
         'hero_right_media_path',
+        'hero_polaroids',
         'story_kicker',
         'story_title',
         'story_description',
@@ -86,6 +103,9 @@ export async function PATCH(request: Request) {
       const clean = Object.fromEntries(
         Object.entries(body.content).filter(([key]) => allowed.includes(key)),
       );
+      if ('hero_polaroids' in clean) {
+        clean.hero_polaroids = normalizeHeroPolaroids(clean.hero_polaroids);
+      }
       const { error } = await supabase
         .from('site_content')
         .update({ ...clean, updated_at: new Date().toISOString() })

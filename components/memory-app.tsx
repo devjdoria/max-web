@@ -29,6 +29,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
+import {
+  defaultHeroPolaroids,
+  type HeroPolaroid,
+} from '@/lib/hero-polaroids';
 
 type Memory = {
   id: string;
@@ -49,6 +53,7 @@ type SiteContent = {
   hero_media_url?: string;
   hero_left_media_url?: string;
   hero_right_media_url?: string;
+  hero_polaroids: HeroPolaroid[];
   story_kicker: string;
   story_title: string;
   story_description: string;
@@ -71,6 +76,7 @@ const defaultContent: SiteContent = {
   hero_name: 'Maxime',
   hero_description:
     'Hoy celebramos tus 21 años, pero yo celebro cada día la suerte de compartir la vida contigo.',
+  hero_polaroids: defaultHeroPolaroids,
   story_kicker: 'Nuestro pequeño universo',
   story_title: 'Una historia que seguimos escribiendo',
   story_description:
@@ -360,28 +366,27 @@ export default function MemoryApp() {
             </span>
           </div>
         </div>
-        <div className="memory-preview left" aria-hidden="true">
-          <div className="preview-sky">
-            {siteContent.hero_left_media_url ? (
-              <img src={siteContent.hero_left_media_url} alt="" />
-            ) : (
-              <Heart fill="currentColor" />
-            )}
-          </div>
-          <p>Nuestra aventura</p>
-          <span>El comienzo de todo</span>
-        </div>
-        <div className="memory-preview right" aria-hidden="true">
-          <div className="preview-sky moon">
-            {siteContent.hero_right_media_url ? (
-              <img src={siteContent.hero_right_media_url} alt="" />
-            ) : (
-              <Sparkles />
-            )}
-          </div>
-          <p>Siempre tú</p>
-          <span>Mi lugar favorito</span>
-        </div>
+        {(siteContent.hero_polaroids || defaultHeroPolaroids).map(
+          (polaroid, index) => (
+            <div
+              className={`memory-preview polaroid-${index}`}
+              aria-hidden="true"
+              key={index}
+            >
+              <div className={`preview-sky ${index % 2 ? 'moon' : ''}`}>
+                {polaroid.media_url ? (
+                  <img src={polaroid.media_url} alt="" />
+                ) : index % 2 ? (
+                  <Sparkles />
+                ) : (
+                  <Heart fill="currentColor" />
+                )}
+              </div>
+              <p>{polaroid.caption}</p>
+              <span>{polaroid.subtitle}</span>
+            </div>
+          ),
+        )}
         <div className="scroll-cue" aria-hidden="true">
           <span>Desliza para descubrir</span>
           <ArrowDown size={17} />

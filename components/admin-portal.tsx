@@ -12,6 +12,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
 import Link from 'next/link';
+import {
+  defaultHeroPolaroids,
+  type HeroPolaroid,
+} from '@/lib/hero-polaroids';
 
 type Content = Record<string, string | null>;
 type Surprise = {
@@ -27,6 +31,9 @@ export default function AdminPortal() {
   const [authenticated, setAuthenticated] = useState(false);
   const [content, setContent] = useState<Content | null>(null);
   const [surprises, setSurprises] = useState<Surprise[]>([]);
+  const [polaroids, setPolaroids] = useState<HeroPolaroid[]>(
+    defaultHeroPolaroids,
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -55,7 +62,14 @@ export default function AdminPortal() {
             `${data.detail || data.error || 'Supabase no ha podido cargar el contenido.'}${runtime}`,
           );
         }
-        setContent(data.content);
+        const { hero_polaroids: loadedPolaroids, ...loadedContent } =
+          data.content;
+        setContent(loadedContent);
+        setPolaroids(
+          Array.isArray(loadedPolaroids)
+            ? loadedPolaroids
+            : defaultHeroPolaroids,
+        );
         setSurprises(data.surprises || []);
       }
     } catch (cause) {
@@ -148,6 +162,62 @@ export default function AdminPortal() {
       setSaving(false);
     }
   }
+  async function uploadPolaroid(file: File | undefined, index: number) {
+    if (!file) return;
+    setSaving(true);
+    setSaved(false);
+    setError('');
+    try {
+      const ticketResponse = await fetch('/api/uploads', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+        }),
+      });
+      const ticket = await ticketResponse.json();
+      if (!ticketResponse.ok || !ticket.path || !ticket.token) {
+        throw new Error(ticket.error || 'No se pudo preparar la subida.');
+      }
+      const { error: uploadError } = await getSupabaseBrowser()
+        .storage.from('memories')
+        .uploadToSignedUrl(ticket.path, ticket.token, file, {
+          contentType: file.type,
+        });
+      if (uploadError) throw uploadError;
+      const next = polaroids.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              media_path: ticket.path,
+              media_url: URL.createObjectURL(file),
+            }
+          : item,
+      );
+      const saveResponse = await fetch('/api/content', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ content: { hero_polaroids: next } }),
+      });
+      const result = await saveResponse.json();
+      if (!saveResponse.ok) {
+        throw new Error(result.error || 'No se pudo publicar la polaroid.');
+      }
+      setPolaroids(next);
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 1800);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'No se pudo subir la polaroid.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
   async function save() {
     if (!content) return;
     setSaving(true);
@@ -156,7 +226,10 @@ export default function AdminPortal() {
     const r = await fetch('/api/content', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ content, surprises }),
+      body: JSON.stringify({
+        content: { ...content, hero_polaroids: polaroids },
+        surprises,
+      }),
     });
     setSaving(false);
     if (r.ok) {
@@ -269,59 +342,71 @@ export default function AdminPortal() {
                 />
               </label>
             </div>
+            <h3 className="admin-subtitle">Polaroids de la portada</h3>
+            <p className="admin-help">
+              Las siete fotos, su frase principal y el texto pequeño se pueden
+              personalizar aquí.
+            </p>
             <div className="admin-retro-images">
-              <div>
-                {content.hero_left_media_url ? (
-                  <img
-                    src={content.hero_left_media_url}
-                    alt="Foto retro izquierda"
-                  />
-                ) : (
-                  <span>
-                    <ImagePlus /> Foto retro izquierda
-                  </span>
-                )}
-                <label>
-                  Cambiar foto izquierda
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) =>
-                      void uploadImage(
-                        e.target.files?.[0],
-                        'hero_left_media_path',
-                        'hero_left_media_url',
-                      )
-                    }
-                  />
-                </label>
-              </div>
-              <div>
-                {content.hero_right_media_url ? (
-                  <img
-                    src={content.hero_right_media_url}
-                    alt="Foto retro derecha"
-                  />
-                ) : (
-                  <span>
-                    <ImagePlus /> Foto retro derecha
-                  </span>
-                )}
-                <label>
-                  Cambiar foto derecha
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) =>
-                      void uploadImage(
-                        e.target.files?.[0],
-                        'hero_right_media_path',
-                        'hero_right_media_url',
-                      )
-                    }
-                  />
-                </label>
-              </div>
+              {polaroids.map((polaroid, index) => (
+                <article key={index}>
+                  <div className="admin-polaroid-preview">
+                    {polaroid.media_url ? (
+                      <img
+                        src={polaroid.media_url}
+                        alt={`Polaroid ${index + 1}`}
+                      />
+                    ) : (
+                      <span>
+                        <ImagePlus /> Polaroid {index + 1}
+                      </span>
+                    )}
+                    <label>
+                      Cambiar imagen
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(event) =>
+                          void uploadPolaroid(
+                            event.target.files?.[0],
+                            index,
+                          )
+                        }
+                      />
+                    </label>
+                  </div>
+                  <label className="admin-polaroid-field">
+                    Texto principal
+                    <Input
+                      value={polaroid.caption}
+                      onChange={(event) =>
+                        setPolaroids((items) =>
+                          items.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, caption: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                  <label className="admin-polaroid-field">
+                    Texto pequeño
+                    <Input
+                      value={polaroid.subtitle}
+                      onChange={(event) =>
+                        setPolaroids((items) =>
+                          items.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, subtitle: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                </article>
+              ))}
             </div>
             <div className="admin-fields">
               {textFields.map(([key, label]) => (
