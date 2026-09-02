@@ -227,12 +227,6 @@ export default function MemoryApp() {
     void withAccess(() => setFormOpen(true));
   }
   function openEditMemory(memory: Memory) {
-    if (memory.id.startsWith('demo-')) {
-      alert(
-        'Este es un recuerdo de ejemplo. Añade uno real para poder editarlo.',
-      );
-      return;
-    }
     setEditing(memory);
     void withAccess(() => setFormOpen(true));
   }
@@ -292,16 +286,17 @@ export default function MemoryApp() {
         body.set('mediaPath', ticket.path);
         body.set('mediaType', file.type);
       }
-      if (editing) body.set('id', editing.id);
+      const editingDemo = Boolean(editing?.id.startsWith('demo-'));
+      if (editing && !editingDemo) body.set('id', editing.id);
       const response = await fetch('/api/memories', {
-        method: editing ? 'PATCH' : 'POST',
+        method: editing && !editingDemo ? 'PATCH' : 'POST',
         body,
       });
       if (!response.ok) throw new Error();
       const memory = (await response.json()) as Memory;
       setMemories((current) =>
         editing
-          ? current.map((item) => (item.id === memory.id ? memory : item))
+          ? current.map((item) => (item.id === editing.id ? memory : item))
           : [memory, ...current.filter((item) => !item.id.startsWith('demo-'))],
       );
       setSaved(true);
@@ -511,15 +506,13 @@ export default function MemoryApp() {
                     </>
                   )}
                 </span>
-                {!memory.id.startsWith('demo-') && (
-                  <button
-                    className="edit-memory"
-                    onClick={() => openEditMemory(memory)}
-                    aria-label={`Editar ${memory.title}`}
-                  >
-                    <Pencil size={14} /> Editar
-                  </button>
-                )}
+                <button
+                  className="edit-memory"
+                  onClick={() => openEditMemory(memory)}
+                  aria-label={`Editar ${memory.title}`}
+                >
+                  <Pencil size={14} /> Editar
+                </button>
               </div>
               <div className="memory-body">
                 <p className="memory-date">
@@ -533,14 +526,12 @@ export default function MemoryApp() {
                     {memory.location}
                   </span>
                 )}
-                {!memory.id.startsWith('demo-') && (
-                  <button
-                    className="edit-memory-action"
-                    onClick={() => openEditMemory(memory)}
-                  >
-                    <Pencil size={14} /> Editar recuerdo
-                  </button>
-                )}
+                <button
+                  className="edit-memory-action"
+                  onClick={() => openEditMemory(memory)}
+                >
+                  <Pencil size={14} /> Editar recuerdo
+                </button>
               </div>
             </article>
           ))}
