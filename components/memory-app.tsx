@@ -761,7 +761,7 @@ export default function MemoryApp() {
         open={!!surprise}
         onOpenChange={(open) => !open && setSurprise(null)}
       >
-        <DialogContent className="surprise-dialog">
+        <DialogContent className="surprise-dialog" showCloseButton={false}>
           <button
             className="modal-x"
             onClick={() => setSurprise(null)}
