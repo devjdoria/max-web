@@ -210,12 +210,14 @@ export default function MemoryApp() {
   }, []);
   const visible = useMemo(
     () =>
-      memories.filter(
-        (m) =>
-          (filter === 'todos' || m.category === filter) &&
-          (!dateFrom || m.date >= dateFrom) &&
-          (!dateTo || m.date <= dateTo),
-      ),
+      memories
+        .filter(
+          (m) =>
+            (filter === 'todos' || m.category === filter) &&
+            (!dateFrom || m.date >= dateFrom) &&
+            (!dateTo || m.date <= dateTo),
+        )
+        .sort((a, b) => b.date.localeCompare(a.date)),
     [filter, memories, dateFrom, dateTo],
   );
   const selectedCmsSurprise = cmsSurprises.find((item) => item.id === surprise);
