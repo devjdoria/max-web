@@ -249,8 +249,7 @@ export default function MemoryApp() {
       return;
     }
     setAccessOpen(false);
-    // Let the access dialog release its focus lock before opening the form.
-    window.setTimeout(() => setFormOpen(true), 500);
+    setFormOpen(true);
   }
   const prettyDate = (date: string) =>
     new Intl.DateTimeFormat('es-ES', {
@@ -534,6 +533,14 @@ export default function MemoryApp() {
                     {memory.location}
                   </span>
                 )}
+                {!memory.id.startsWith('demo-') && (
+                  <button
+                    className="edit-memory-action"
+                    onClick={() => openEditMemory(memory)}
+                  >
+                    <Pencil size={14} /> Editar recuerdo
+                  </button>
+                )}
               </div>
             </article>
           ))}
@@ -620,29 +627,50 @@ export default function MemoryApp() {
         <small>Hecho con amor, para Maxime.</small>
       </footer>
       <Dialog
-        modal={false}
-        open={formOpen}
+        open={formOpen || accessOpen}
         onOpenChange={(open) => {
-          setFormOpen(open);
-          if (!open) setEditing(null);
+          if (!open) {
+            setFormOpen(false);
+            setAccessOpen(false);
+            setEditing(null);
+          }
         }}
       >
-        <DialogContent className="memory-dialog">
-          <DialogHeader>
-            <DialogTitle>
-              {editing ? 'Editar este recuerdo' : 'Guardar un nuevo recuerdo'}
-            </DialogTitle>
-            <DialogDescription>
-              {editing
-                ? 'Corrige lo que necesites. El recuerdo nunca se podrá borrar.'
-                : 'Una foto, un vídeo, un lugar… todo lo que no queréis olvidar.'}
-            </DialogDescription>
-          </DialogHeader>
-          <form
-            key={editing?.id ?? 'new'}
-            onSubmit={saveMemory}
-            className="memory-form"
-          >
+        {accessOpen ? (
+          <DialogContent className="access-dialog">
+            <DialogHeader>
+              <DialogTitle>Solo nosotros sabemos la respuesta</DialogTitle>
+              <DialogDescription>
+                ¿Qué día empezó nuestra historia?
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={unlock}>
+              <Input name="date" type="date" required autoFocus />
+              <button type="submit">
+                <Heart size={16} /> Entrar
+              </button>
+              {accessError && <p role="alert">{accessError}</p>}
+            </form>
+          </DialogContent>
+        ) : (
+          <DialogContent className="memory-dialog">
+            <DialogHeader>
+              <DialogTitle>
+                {editing
+                  ? 'Editar este recuerdo'
+                  : 'Guardar un nuevo recuerdo'}
+              </DialogTitle>
+              <DialogDescription>
+                {editing
+                  ? 'Corrige lo que necesites. El recuerdo nunca se podrá borrar.'
+                  : 'Una foto, un vídeo, un lugar… todo lo que no queréis olvidar.'}
+              </DialogDescription>
+            </DialogHeader>
+            <form
+              key={editing?.id ?? 'new'}
+              onSubmit={saveMemory}
+              className="memory-form"
+            >
             <label>
               Título
               <Input
@@ -725,28 +753,11 @@ export default function MemoryApp() {
                 </>
               )}
             </button>
-          </form>
-        </DialogContent>
-      </Dialog>
-      <Dialog modal={false} open={accessOpen} onOpenChange={setAccessOpen}>
-        <DialogContent className="access-dialog">
-          <DialogHeader>
-            <DialogTitle>Solo nosotros sabemos la respuesta</DialogTitle>
-            <DialogDescription>
-              ¿Qué día empezó nuestra historia?
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={unlock}>
-            <Input name="date" type="date" required autoFocus />
-            <button type="submit">
-              <Heart size={16} /> Entrar
-            </button>
-            {accessError && <p role="alert">{accessError}</p>}
-          </form>
-        </DialogContent>
+            </form>
+          </DialogContent>
+        )}
       </Dialog>
       <Dialog
-        modal={false}
         open={!!surprise}
         onOpenChange={(open) => !open && setSurprise(null)}
       >
