@@ -120,6 +120,7 @@ export default function MemoryApp() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [surprise, setSurprise] = useState<string | null>(null);
+  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   useEffect(() => {
@@ -476,10 +477,20 @@ export default function MemoryApp() {
               className={`memory-card card-${index % 3}`}
               key={memory.id}
             >
+              <button
+                className="memory-open"
+                onClick={() => setSelectedMemory(memory)}
+                aria-label={`Ampliar ${memory.title}`}
+              />
               <div className="memory-media">
                 {memory.mediaUrl ? (
                   memory.mediaType?.startsWith('video') ? (
-                    <video src={memory.mediaUrl} controls preload="metadata" />
+                    <video
+                      src={memory.mediaUrl}
+                      controls
+                      preload="metadata"
+                      onClick={(event) => event.stopPropagation()}
+                    />
                   ) : (
                     <img src={memory.mediaUrl} alt={memory.title} />
                   )
@@ -508,7 +519,10 @@ export default function MemoryApp() {
                 </span>
                 <button
                   className="edit-memory"
-                  onClick={() => openEditMemory(memory)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openEditMemory(memory);
+                  }}
                   aria-label={`Editar ${memory.title}`}
                 >
                   <Pencil size={14} /> Editar
@@ -528,7 +542,10 @@ export default function MemoryApp() {
                 )}
                 <button
                   className="edit-memory-action"
-                  onClick={() => openEditMemory(memory)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openEditMemory(memory);
+                  }}
                 >
                   <Pencil size={14} /> Editar recuerdo
                 </button>
@@ -617,6 +634,70 @@ export default function MemoryApp() {
         <p>{siteContent.footer_text}</p>
         <small>Hecho con amor, para Maxime.</small>
       </footer>
+      <Dialog
+        open={Boolean(selectedMemory)}
+        onOpenChange={(open) => !open && setSelectedMemory(null)}
+      >
+        <DialogContent className="memory-viewer">
+          {selectedMemory && (
+            <>
+              <div className="memory-viewer-media">
+                {selectedMemory.mediaUrl ? (
+                  selectedMemory.mediaType?.startsWith('video') ? (
+                    <video
+                      src={selectedMemory.mediaUrl}
+                      controls
+                      autoPlay
+                      preload="metadata"
+                    />
+                  ) : (
+                    <img
+                      src={selectedMemory.mediaUrl}
+                      alt={selectedMemory.title}
+                    />
+                  )
+                ) : (
+                  <div className="media-placeholder">
+                    <span>
+                      {selectedMemory.category === 'viaje' ? (
+                        <MapPin />
+                      ) : (
+                        <Heart fill="currentColor" />
+                      )}
+                    </span>
+                    <small>Este recuerdo todavía no tiene foto</small>
+                  </div>
+                )}
+              </div>
+              <div className="memory-viewer-copy">
+                <span className="memory-viewer-meta">
+                  <CalendarDays size={14} />
+                  {prettyDate(selectedMemory.date)}
+                  {selectedMemory.location && (
+                    <>
+                      <MapPin size={14} /> {selectedMemory.location}
+                    </>
+                  )}
+                </span>
+                <DialogTitle>{selectedMemory.title}</DialogTitle>
+                <DialogDescription>
+                  {selectedMemory.description}
+                </DialogDescription>
+                <button
+                  className="viewer-edit"
+                  onClick={() => {
+                    const memory = selectedMemory;
+                    setSelectedMemory(null);
+                    window.setTimeout(() => openEditMemory(memory), 220);
+                  }}
+                >
+                  <Pencil size={14} /> Editar este recuerdo
+                </button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={formOpen || accessOpen}
         onOpenChange={(open) => {
