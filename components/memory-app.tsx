@@ -42,6 +42,7 @@ type Memory = {
   date: string;
   location?: string;
   mediaUrl?: string;
+  mediaUrls?: string[];
   mediaType?: string;
 };
 type SiteContent = {
@@ -128,6 +129,10 @@ export default function MemoryApp() {
   const [dateTo, setDateTo] = useState('');
   const [surprise, setSurprise] = useState<string | null>(null);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
+  const [viewerImageIndex, setViewerImageIndex] = useState(0);
+  const [formCategory, setFormCategory] = useState<'viaje' | 'momento'>(
+    'momento',
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   useEffect(() => {
@@ -222,6 +227,11 @@ export default function MemoryApp() {
     [filter, memories, dateFrom, dateTo],
   );
   const selectedCmsSurprise = cmsSurprises.find((item) => item.id === surprise);
+  const selectedMediaUrls = selectedMemory?.mediaUrls?.length
+    ? selectedMemory.mediaUrls
+    : selectedMemory?.mediaUrl
+      ? [selectedMemory.mediaUrl]
+      : [];
 
   async function withAccess(action: () => void) {
     const response = await fetch('/api/access');
@@ -234,10 +244,12 @@ export default function MemoryApp() {
   }
   function openNewMemory() {
     setEditing(null);
+    setFormCategory('momento');
     void withAccess(() => setFormOpen(true));
   }
   function openEditMemory(memory: Memory) {
     setEditing(memory);
+    setFormCategory(memory.category);
     void withAccess(() => setFormOpen(true));
   }
   async function unlock(event: React.SyntheticEvent<HTMLFormElement>) {
@@ -270,31 +282,50 @@ export default function MemoryApp() {
     const form = event.currentTarget;
     try {
       const body = new FormData(form);
-      const file = body.get('media');
+      const files = body
+        .getAll('media')
+        .filter((item): item is File => item instanceof File && item.size > 0);
       body.delete('media');
-      if (file instanceof File && file.size) {
-        const ticketResponse = await fetch('/api/uploads', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            name: file.name,
-            type: file.type,
-            size: file.size,
-          }),
-        });
-        if (!ticketResponse.ok) throw new Error();
-        const ticket = (await ticketResponse.json()) as {
-          path: string;
-          token: string;
-        };
-        const { error } = await getSupabaseBrowser()
-          .storage.from('memories')
-          .uploadToSignedUrl(ticket.path, ticket.token, file, {
-            contentType: file.type,
+      const categoryValue = body.get('category');
+      const category =
+        typeof categoryValue === 'string' ? categoryValue : 'momento';
+      const maxPhotos = category === 'viaje' ? 10 : 1;
+      if (files.length > maxPhotos) {
+        throw new Error(
+          category === 'viaje'
+            ? 'Un viaje admite un máximo de 10 fotos.'
+            : 'Un momento solo admite una foto.',
+        );
+      }
+      if (files.some((file) => !file.type.startsWith('image/'))) {
+        throw new Error('Los recuerdos solo admiten archivos de imagen.');
+      }
+      if (files.length) {
+        const paths: string[] = [];
+        for (const file of files) {
+          const ticketResponse = await fetch('/api/uploads', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+            }),
           });
-        if (error) throw error;
-        body.set('mediaPath', ticket.path);
-        body.set('mediaType', file.type);
+          if (!ticketResponse.ok) throw new Error('No se pudo subir una foto.');
+          const ticket = (await ticketResponse.json()) as {
+            path: string;
+            token: string;
+          };
+          const { error } = await getSupabaseBrowser()
+            .storage.from('memories')
+            .uploadToSignedUrl(ticket.path, ticket.token, file, {
+              contentType: file.type,
+            });
+          if (error) throw error;
+          paths.push(ticket.path);
+        }
+        body.set('mediaPaths', JSON.stringify(paths));
       }
       const editingDemo = Boolean(editing?.id.startsWith('demo-'));
       if (editing && !editingDemo) body.set('id', editing.id);
@@ -316,9 +347,11 @@ export default function MemoryApp() {
         setEditing(null);
         setSaved(false);
       }, 900);
-    } catch {
+    } catch (cause) {
       alert(
-        'No hemos podido guardar el recuerdo o subir el archivo. Prueba de nuevo en un momento.',
+        cause instanceof Error && cause.message
+          ? cause.message
+          : 'No hemos podido guardar el recuerdo o subir las fotos. Prueba de nuevo en un momento.',
       );
     } finally {
       setSaving(false);
@@ -499,7 +532,10 @@ export default function MemoryApp() {
             >
               <button
                 className="memory-open"
-                onClick={() => setSelectedMemory(memory)}
+              onClick={() => {
+                setViewerImageIndex(0);
+                setSelectedMemory(memory);
+              }}
                 aria-label={`Ampliar ${memory.title}`}
               />
               <div className="memory-media">
@@ -662,20 +698,19 @@ export default function MemoryApp() {
           {selectedMemory && (
             <>
               <div className="memory-viewer-media">
-                {selectedMemory.mediaUrl ? (
-                  selectedMemory.mediaType?.startsWith('video') ? (
-                    <video
-                      src={selectedMemory.mediaUrl}
-                      controls
-                      autoPlay
-                      preload="metadata"
-                    />
-                  ) : (
-                    <img
-                      src={selectedMemory.mediaUrl}
-                      alt={selectedMemory.title}
-                    />
-                  )
+                {selectedMediaUrls.length &&
+                selectedMemory.mediaType?.startsWith('video') ? (
+                  <video
+                    src={selectedMediaUrls[0]}
+                    controls
+                    autoPlay
+                    preload="metadata"
+                  />
+                ) : selectedMediaUrls.length ? (
+                  <img
+                    src={selectedMediaUrls[viewerImageIndex]}
+                    alt={`${selectedMemory.title} · foto ${viewerImageIndex + 1}`}
+                  />
                 ) : (
                   <div className="media-placeholder">
                     <span>
@@ -686,6 +721,20 @@ export default function MemoryApp() {
                       )}
                     </span>
                     <small>Este recuerdo todavía no tiene foto</small>
+                  </div>
+                )}
+                {selectedMediaUrls.length > 1 && (
+                  <div className="memory-viewer-thumbnails">
+                    {selectedMediaUrls.map((url, index) => (
+                      <button
+                        key={url}
+                        className={index === viewerImageIndex ? 'active' : ''}
+                        onClick={() => setViewerImageIndex(index)}
+                        aria-label={`Ver foto ${index + 1}`}
+                      >
+                        <img src={url} alt="" />
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -786,7 +835,10 @@ export default function MemoryApp() {
                 Tipo
                 <select
                   name="category"
-                  defaultValue={editing?.category ?? 'momento'}
+                  value={formCategory}
+                  onChange={(event) =>
+                    setFormCategory(event.target.value as 'viaje' | 'momento')
+                  }
                 >
                   <option value="momento">Momento</option>
                   <option value="viaje">Viaje</option>
@@ -815,16 +867,27 @@ export default function MemoryApp() {
               <span>
                 <strong>
                   {editing?.mediaUrl
-                    ? 'Cambiar foto o vídeo'
-                    : 'Sube una foto o vídeo'}
+                    ? formCategory === 'viaje'
+                      ? 'Cambiar las fotos del viaje'
+                      : 'Cambiar la foto'
+                    : formCategory === 'viaje'
+                      ? 'Sube hasta 10 fotos'
+                      : 'Sube una foto'}
                 </strong>
                 <small>
                   {editing?.mediaUrl
-                    ? 'Déjalo vacío para conservar el actual'
-                    : 'JPG, PNG, WebP o vídeo · máx. 50 MB'}
+                    ? 'Déjalo vacío para conservar las actuales'
+                    : formCategory === 'viaje'
+                      ? 'Puedes seleccionar entre 1 y 10 imágenes'
+                      : 'JPG, PNG o WebP · una sola imagen'}
                 </small>
               </span>
-              <Input name="media" type="file" accept="image/*,video/*" />
+              <Input
+                name="media"
+                type="file"
+                accept="image/*"
+                multiple={formCategory === 'viaje'}
+              />
             </label>
             <button className="save-memory" disabled={saving || saved}>
               {saving ? (

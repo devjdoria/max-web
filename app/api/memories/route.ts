@@ -11,11 +11,20 @@ type Row = {
   memory_date: string;
   location: string | null;
   media_path: string | null;
+  media_paths: string[] | null;
   media_type: string | null;
 };
 
 function present(row: Row) {
   const supabase = getSupabaseAdmin();
+  const paths = Array.isArray(row.media_paths)
+    ? row.media_paths
+    : row.media_path
+      ? [row.media_path]
+      : [];
+  const mediaUrls = paths.map(
+    (path) => supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl,
+  );
   return {
     id: row.id,
     title: row.title,
@@ -28,6 +37,7 @@ function present(row: Row) {
           .publicUrl
       : undefined,
     mediaType: row.media_type ?? undefined,
+    mediaUrls,
   };
 }
 
@@ -55,14 +65,25 @@ function valid(fields: ReturnType<typeof readFields>) {
   );
 }
 
+function readMediaPaths(data: FormData) {
+  const raw = formText(data, 'mediaPaths');
+  if (!raw) return null;
+  try {
+    const paths = JSON.parse(raw);
+    return Array.isArray(paths) && paths.every((path) => typeof path === 'string')
+      ? paths
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   try {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from('memories')
-      .select(
-        'id,title,description,category,memory_date,location,media_path,media_type',
-      )
+      .select('*')
       .order('memory_date', { ascending: false });
     if (error) throw error;
     return Response.json((data as Row[]).map(present));
@@ -83,14 +104,19 @@ export async function POST(request: Request) {
     if (!valid(fields))
       return Response.json({ error: 'Datos incompletos' }, { status: 400 });
     const media_path = formText(data, 'mediaPath') || null;
+    const media_paths = readMediaPaths(data) ?? (media_path ? [media_path] : []);
     const media_type = formText(data, 'mediaType') || null;
+    const maxPhotos = fields.category === 'viaje' ? 10 : 1;
+    if (media_paths.length > maxPhotos)
+      return Response.json({ error: 'Demasiadas fotos' }, { status: 400 });
     const supabase = getSupabaseAdmin();
     const { data: row, error } = await supabase
       .from('memories')
       .insert({
         ...fields,
         category: fields.category as 'viaje' | 'momento',
-        media_path,
+        media_path: media_paths[0] ?? media_path,
+        media_paths,
         media_type,
       })
       .select()
@@ -115,8 +141,18 @@ export async function PATCH(request: Request) {
     if (!/^[a-f0-9-]{36}$/.test(id) || !valid(fields))
       return Response.json({ error: 'Datos incompletos' }, { status: 400 });
     const mediaPath = formText(data, 'mediaPath');
-    const media = mediaPath
-      ? { media_path: mediaPath, media_type: formText(data, 'mediaType') }
+    const mediaPaths = readMediaPaths(data);
+    const maxPhotos = fields.category === 'viaje' ? 10 : 1;
+    if (mediaPaths && mediaPaths.length > maxPhotos)
+      return Response.json({ error: 'Demasiadas fotos' }, { status: 400 });
+    const media = mediaPaths
+      ? {
+          media_path: mediaPaths[0] ?? null,
+          media_paths: mediaPaths,
+          media_type: 'image/*',
+        }
+      : mediaPath
+        ? { media_path: mediaPath, media_type: formText(data, 'mediaType') }
       : {};
     const supabase = getSupabaseAdmin();
     const { data: row, error } = await supabase

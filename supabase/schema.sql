@@ -8,6 +8,7 @@ create table if not exists public.memories (
   memory_date date not null,
   location text,
   media_path text,
+  media_paths jsonb,
   media_type text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -32,6 +33,8 @@ create table if not exists public.site_content (
   footer_text text not null default 'Que este sea solo el capítulo 21 de una historia infinita.',
   updated_at timestamptz not null default now()
 );
+
+alter table public.memories add column if not exists media_paths jsonb;
 
 alter table public.site_content add column if not exists hero_left_media_path text;
 alter table public.site_content add column if not exists hero_right_media_path text;
