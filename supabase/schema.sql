@@ -21,6 +21,7 @@ create table if not exists public.site_content (
   hero_name text not null default 'Maxime',
   hero_description text not null default 'Hoy celebramos tus 21 años, pero yo celebro cada día la suerte de compartir la vida contigo.',
   hero_media_path text,
+  hero_media_type text,
   hero_left_media_path text,
   hero_right_media_path text,
   hero_polaroids jsonb,
@@ -35,6 +36,7 @@ create table if not exists public.site_content (
 alter table public.site_content add column if not exists hero_left_media_path text;
 alter table public.site_content add column if not exists hero_right_media_path text;
 alter table public.site_content add column if not exists hero_polaroids jsonb;
+alter table public.site_content add column if not exists hero_media_type text;
 
 insert into public.site_content (id) values ('main') on conflict (id) do nothing;
 

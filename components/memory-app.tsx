@@ -51,6 +51,7 @@ type SiteContent = {
   hero_name: string;
   hero_description: string;
   hero_media_url?: string;
+  hero_media_type?: string;
   hero_left_media_url?: string;
   hero_right_media_url?: string;
   hero_polaroids: HeroPolaroid[];
@@ -339,14 +340,26 @@ export default function MemoryApp() {
             </a>
           </div>
         </nav>
-        {siteContent.hero_media_url && (
+        {siteContent.hero_media_url &&
+        siteContent.hero_media_type?.startsWith('video/') ? (
+          <video
+            className="hero-video"
+            src={siteContent.hero_media_url}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-hidden="true"
+          />
+        ) : siteContent.hero_media_url ? (
           <div
             className="hero-photo"
             style={{
               backgroundImage: `linear-gradient(rgba(3,20,46,.55),rgba(3,20,46,.72)),url(${siteContent.hero_media_url})`,
             }}
           />
-        )}
+        ) : null}
         <div className="hero-glow" aria-hidden="true" />
         <div className="hero-content">
           <p className="eyebrow">

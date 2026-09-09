@@ -91,6 +91,7 @@ export async function PATCH(request: Request) {
         'hero_name',
         'hero_description',
         'hero_media_path',
+        'hero_media_type',
         'hero_left_media_path',
         'hero_right_media_path',
         'hero_polaroids',

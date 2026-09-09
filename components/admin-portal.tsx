@@ -105,6 +105,7 @@ export default function AdminPortal() {
     file: File | undefined,
     pathKey: string,
     urlKey: string,
+    extraContent: Record<string, string> = {},
   ) {
     if (!file || !content) return;
     setSaving(true);
@@ -133,7 +134,9 @@ export default function AdminPortal() {
       const saveResponse = await fetch('/api/content', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ content: { [pathKey]: ticket.path } }),
+        body: JSON.stringify({
+          content: { [pathKey]: ticket.path, ...extraContent },
+        }),
       });
       const saveResult = await saveResponse.json();
       if (!saveResponse.ok) {
@@ -147,6 +150,7 @@ export default function AdminPortal() {
               ...current,
               [pathKey]: ticket.path,
               [urlKey]: URL.createObjectURL(file),
+              ...extraContent,
             }
           : current,
       );
@@ -161,6 +165,40 @@ export default function AdminPortal() {
     } finally {
       setSaving(false);
     }
+  }
+  async function uploadHeroMedia(file: File | undefined) {
+    if (!file) return;
+    if (file.type.startsWith('video/')) {
+      const duration = await new Promise<number>((resolve, reject) => {
+        const video = document.createElement('video');
+        const url = URL.createObjectURL(file);
+        video.preload = 'metadata';
+        video.onloadedmetadata = () => {
+          URL.revokeObjectURL(url);
+          resolve(video.duration);
+        };
+        video.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('No se pudo leer la duración del vídeo.'));
+        };
+        video.src = url;
+      }).catch((cause) => {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : 'No se pudo leer el vídeo.',
+        );
+        return null;
+      });
+      if (duration === null) return;
+      if (duration > 20.1) {
+        setError('El vídeo de portada no puede durar más de 20 segundos.');
+        return;
+      }
+    }
+    await uploadImage(file, 'hero_media_path', 'hero_media_url', {
+      hero_media_type: file.type,
+    });
   }
   async function uploadPolaroid(file: File | undefined, index: number) {
     if (!file) return;
@@ -319,7 +357,16 @@ export default function AdminPortal() {
             <p className="section-kicker">Contenido principal</p>
             <h2>Portada y textos</h2>
             <div className="admin-cover">
-              {content.hero_media_url ? (
+              {content.hero_media_url &&
+              content.hero_media_type?.startsWith('video/') ? (
+                <video
+                  src={content.hero_media_url}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                />
+              ) : content.hero_media_url ? (
                 <img src={content.hero_media_url} alt="Portada actual" />
               ) : (
                 <span>
@@ -328,20 +375,20 @@ export default function AdminPortal() {
                 </span>
               )}
               <label>
-                Cambiar portada
+                Cambiar imagen o vídeo
                 <Input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/*"
                   onChange={(e) =>
-                    void uploadImage(
-                      e.target.files?.[0],
-                      'hero_media_path',
-                      'hero_media_url',
-                    )
+                    void uploadHeroMedia(e.target.files?.[0])
                   }
                 />
               </label>
             </div>
+            <p className="admin-cover-help">
+              Los vídeos se reproducen silenciados y en bucle · máximo 20
+              segundos.
+            </p>
             <h3 className="admin-subtitle">Polaroids de la portada</h3>
             <p className="admin-help">
               Las siete fotos, su frase principal y el texto pequeño se pueden
