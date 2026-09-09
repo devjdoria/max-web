@@ -79,6 +79,8 @@ function readMediaPaths(data: FormData) {
 }
 
 export async function GET() {
+  if (!(await hasAccess()))
+    return Response.json({ error: 'Acceso necesario' }, { status: 401 });
   try {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase

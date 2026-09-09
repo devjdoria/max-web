@@ -31,6 +31,8 @@ function withHeroUrl(content: Record<string, unknown>) {
   };
 }
 export async function GET() {
+  if (!(await hasAccess()))
+    return Response.json({ error: 'Acceso necesario' }, { status: 401 });
   try {
     const supabase = getSupabaseAdmin();
     const [

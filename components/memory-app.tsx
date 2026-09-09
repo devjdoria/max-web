@@ -123,7 +123,7 @@ export default function MemoryApp() {
   const [filter, setFilter] = useState<'todos' | 'viaje' | 'momento'>('todos');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Memory | null>(null);
-  const [accessOpen, setAccessOpen] = useState(false);
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [accessError, setAccessError] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -136,14 +136,22 @@ export default function MemoryApp() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   useEffect(() => {
+    fetch('/api/access')
+      .then((response) => response.json())
+      .then((result) => setAuthenticated(Boolean(result.authenticated)))
+      .catch(() => setAuthenticated(false));
+  }, []);
+  useEffect(() => {
+    if (!authenticated) return;
     fetch('/api/memories')
       .then((r) => (r.ok ? r.json() : []))
       .then((items: Memory[]) => {
         if (items.length) setMemories(items);
       })
       .catch(() => {});
-  }, []);
+  }, [authenticated]);
   useEffect(() => {
+    if (!authenticated) return;
     fetch('/api/content')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -151,7 +159,7 @@ export default function MemoryApp() {
         if (data?.surprises) setCmsSurprises(data.surprises);
       })
       .catch(() => {});
-  }, []);
+  }, [authenticated]);
   useEffect(() => {
     const context = (
       document as Document & {
@@ -233,24 +241,15 @@ export default function MemoryApp() {
       ? [selectedMemory.mediaUrl]
       : [];
 
-  async function withAccess(action: () => void) {
-    const response = await fetch('/api/access');
-    const result = (await response.json()) as { authenticated: boolean };
-    if (result.authenticated) action();
-    else {
-      setAccessError('');
-      setAccessOpen(true);
-    }
-  }
   function openNewMemory() {
     setEditing(null);
     setFormCategory('momento');
-    void withAccess(() => setFormOpen(true));
+    setFormOpen(true);
   }
   function openEditMemory(memory: Memory) {
     setEditing(memory);
     setFormCategory(memory.category);
-    void withAccess(() => setFormOpen(true));
+    setFormOpen(true);
   }
   async function unlock(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -264,8 +263,8 @@ export default function MemoryApp() {
       setAccessError('Esa no es nuestra fecha. Inténtalo otra vez.');
       return;
     }
-    setAccessOpen(false);
-    setFormOpen(true);
+    setAccessError('');
+    setAuthenticated(true);
   }
   const prettyDate = (date: string) =>
     new Intl.DateTimeFormat('es-ES', {
@@ -357,6 +356,39 @@ export default function MemoryApp() {
       setSaving(false);
     }
   }
+
+  if (authenticated === null)
+    return (
+      <main className="admin-loading">
+        <div>
+          <LoaderCircle />
+          <span>Preparando vuestra historia…</span>
+        </div>
+      </main>
+    );
+
+  if (!authenticated)
+    return (
+      <main className="site-access">
+        <div className="site-access-card">
+          <span className="site-access-heart">
+            <Heart fill="currentColor" />
+          </span>
+          <p>Un lugar solo para nosotros</p>
+          <h1>Nuestra fecha abre la puerta</h1>
+          <span className="site-access-copy">
+            ¿Qué día empezó nuestra historia?
+          </span>
+          <form onSubmit={unlock}>
+            <Input name="date" type="date" required autoFocus />
+            <button type="submit">
+              <Heart size={16} /> Entrar
+            </button>
+            {accessError && <small role="alert">{accessError}</small>}
+          </form>
+        </div>
+      </main>
+    );
 
   return (
     <main className="birthday-page">
@@ -768,33 +800,15 @@ export default function MemoryApp() {
         </DialogContent>
       </Dialog>
       <Dialog
-        open={formOpen || accessOpen}
+        open={formOpen}
         onOpenChange={(open) => {
           if (!open) {
             setFormOpen(false);
-            setAccessOpen(false);
             setEditing(null);
           }
         }}
       >
-        {accessOpen ? (
-          <DialogContent className="access-dialog">
-            <DialogHeader>
-              <DialogTitle>Solo nosotros sabemos la respuesta</DialogTitle>
-              <DialogDescription>
-                ¿Qué día empezó nuestra historia?
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={unlock}>
-              <Input name="date" type="date" required autoFocus />
-              <button type="submit">
-                <Heart size={16} /> Entrar
-              </button>
-              {accessError && <p role="alert">{accessError}</p>}
-            </form>
-          </DialogContent>
-        ) : (
-          <DialogContent className="memory-dialog">
+        <DialogContent className="memory-dialog">
             <DialogHeader>
               <DialogTitle>
                 {editing
@@ -908,9 +922,8 @@ export default function MemoryApp() {
                 </>
               )}
             </button>
-            </form>
-          </DialogContent>
-        )}
+          </form>
+        </DialogContent>
       </Dialog>
       <Dialog
         open={!!surprise}
